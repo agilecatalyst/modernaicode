@@ -125,10 +125,24 @@ export default function QuizEngine({ db, quizConfig, setQuizConfig, setActiveTab
     const activeModel = llmStatus.models[0] || 'default';
     const isStudio = llmStatus.type.includes('Studio');
     
+    const textLen = chunk.content.length;
+    const maxSnippetLen = 1800;
+    const maxStart = Math.max(0, textLen - maxSnippetLen);
+    const randomStart = Math.floor(Math.random() * (maxStart + 1));
+    const textSnippet = chunk.content.substring(randomStart, randomStart + maxSnippetLen);
+    const angles = [
+      "Focus on a practical real-world scenario or application.",
+      "Focus on syntax, code usage, or API specifics.",
+      "Focus on edge-cases, common pitfalls, or debugging.",
+      "Focus on high-level architecture and design tradeoffs."
+    ];
+    const randomAngle = angles[Math.floor(Math.random() * angles.length)];
+
     const prompt = `
 Generate exactly one high-quality multiple choice quiz question based on this technical documentation segment.
 Title: ${chunk.title}
-Text: ${chunk.content.substring(0, 1500)}
+Perspective: ${randomAngle}
+Text: ${textSnippet}
 
 The question must test deep conceptual understanding or syntax.
 You MUST respond in strict JSON format with exactly these fields:
@@ -149,14 +163,14 @@ Do not add any markdown framing (like \`\`\`json) or leading/trailing text. Outp
         { role: 'system', content: 'You are a Starfleet training computer. Output raw JSON ONLY.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.3
+      temperature: 0.75
     } : {
       model: activeModel,
       messages: [
         { role: 'user', content: prompt }
       ],
       stream: false,
-      options: { temperature: 0.3 }
+      options: { temperature: 0.75 }
     };
     
     try {
@@ -219,7 +233,7 @@ Do not add any markdown framing (like \`\`\`json) or leading/trailing text. Outp
       const matchedDq = DEFAULT_QUIZZES.find(dq => 
         chunk.title.toLowerCase().includes(dq.topic.toLowerCase()) || 
         chunk.content.toLowerCase().includes(dq.topic.toLowerCase())
-      ) || DEFAULT_QUIZZES[0];
+      ) || DEFAULT_QUIZZES[Math.floor(Math.random() * DEFAULT_QUIZZES.length)];
       
       const fallbackQuiz = {
         ...matchedDq,
@@ -291,7 +305,7 @@ Do not add any markdown framing (like \`\`\`json) or leading/trailing text. Outp
           const matchedDq = DEFAULT_QUIZZES.find(dq => 
             chunk && (chunk.title.toLowerCase().includes(dq.topic.toLowerCase()) || 
             chunk.content.toLowerCase().includes(dq.topic.toLowerCase()))
-          ) || DEFAULT_QUIZZES[0];
+          ) || DEFAULT_QUIZZES[Math.floor(Math.random() * DEFAULT_QUIZZES.length)];
           
           const fallbackQuiz = {
             ...matchedDq,
@@ -311,12 +325,13 @@ Do not add any markdown framing (like \`\`\`json) or leading/trailing text. Outp
         const bookChunks = db.chunks.filter(c => c.book_id === quizConfig.id);
         if (bookChunks.length > 0) {
           if (llmStatus && llmStatus.online) {
-            triggerJitGeneration(bookChunks[0].id, quizConfig.id);
+            const randomChunk = bookChunks[Math.floor(Math.random() * bookChunks.length)];
+            triggerJitGeneration(randomChunk.id, quizConfig.id);
             return;
           } else {
             // Book offline fallback
             const fallbackQuiz = {
-              ...DEFAULT_QUIZZES[0],
+              ...DEFAULT_QUIZZES[Math.floor(Math.random() * DEFAULT_QUIZZES.length)],
               id: `quiz_fb_book_offline_${Date.now()}`,
               chunk_id: bookChunks[0].id,
               book_id: quizConfig.id
